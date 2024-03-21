@@ -26,9 +26,9 @@ import io.flutter.plugin.common.PluginRegistry
 import org.json.JSONObject
 
 class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, PluginRegistry.ActivityResultListener {
-  private lateinit var channel: MethodChannel
+    private lateinit var channel: MethodChannel
     private var binding: ActivityPluginBinding? = null
-    private var hyperServices: HyperServices? = null
+    private var hyperServicesMap: MutableMap<String, HyperServices> = HashMap()
     private var isHyperCheckOutLiteInteg: Boolean = false
 
     override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
@@ -60,7 +60,10 @@ class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Pl
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         try {
-            hyperServices!!.onActivityResult(requestCode, resultCode, data!!)
+            hyperServicesMap.forEach {
+                (clientId, hyperServices) ->
+                    hyperServices.onActivityResult(requestCode, resultCode, data!!)
+            }
             return true
         } catch (e: Exception) {
             return false;
@@ -68,25 +71,26 @@ class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Pl
     }
 
     override fun onMethodCall(@NonNull call: MethodCall, @NonNull result: Result) {
+        val clientId = call.argument<String>("clientId")
         when (call.method) {
-            "preFetch" -> preFetch(call.argument<Map<String, Any>>("params"), result)
-            "initiate" -> initiate(call.argument<Map<String, Any>>("params"), result)
-            "process" -> process(call.argument<Map<String, Any>>("params"), result)
-            "terminate" -> terminate(result)
-            "isInitialised" -> isInitialised(result)
-            "onBackPress" -> onBackPress(result)
-            "openPaymentPage" -> openPaymentPage(call.argument<Map<String, Any>>("params"), result)
+            "preFetch" -> preFetch(call.argument<Map<String, Any>>("params"), clientId, result)
+            "initiate" -> initiate(call.argument<Map<String, Any>>("params"), clientId, result)
+            "process" -> process(call.argument<Map<String, Any>>("params"), clientId, result)
+            "terminate" -> terminate(clientId, result)
+            "isInitialised" -> isInitialised(clientId, result)
+            "onBackPress" -> onBackPress(clientId, result)
+            "openPaymentPage" -> openPaymentPage(call.argument<Map<String, Any>>("params"), clientId, result)
             else -> result.notImplemented()
         }
     }
 
-    private fun onBackPress(result: Result) {
+    private fun onBackPress(clientId: String?, result: Result) {
         try {
             if (isHyperCheckOutLiteInteg) {
                 val backPress = HyperCheckoutLite.onBackPressed();
                 result.success(backPress)
             }else{
-                val backPress = hyperServices!!.onBackPressed()
+                val backPress = hyperServicesMap.get(clientId)!!.onBackPressed()
                 result.success(backPress)
             }
         } catch(e: Exception) {
@@ -94,28 +98,34 @@ class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Pl
         }
     }
 
-    private fun isInitialised(result: Result) {
+    private fun isInitialised(clientId: String?, result: Result) {
         try {
-            val isInitiated = hyperServices!!.isInitialised
+            val isInitiated: Boolean
+            if (hyperServicesMap.get(clientId) == null) {
+                isInitiated = false
+            } else {
+                isInitiated = hyperServicesMap.get(clientId)!!.isInitialised
+            }
             result.success(isInitiated)
         } catch(e: Exception) {
             result.success(false)
         }
     }
 
-    private fun preFetch(params: Map<String, Any>?, result: Result) {
+    private fun preFetch(params: Map<String, Any>?, clientId: String?, result: Result) {
         try {
-            HyperServices.preFetch(binding!!.activity, JSONObject(params))
+            HyperServices.preFetch(binding!!.activity, JSONObject(params), clientId)
             result.success(true)
         } catch (e: Exception) {
             result.error("HYPERSDKFLUTTER: prefetch error", e.message, e)
         }
     }
 
-    private fun initiate(params: Map<String, Any>?, result: Result) = try {
-
+    private fun initiate(params: Map<String, Any>?, clientId: String?, result: Result) = try {
+        println("client: $clientId")
         val fragmentActivity = binding!!.activity as FragmentActivity
-        hyperServices = HyperServices(fragmentActivity)
+        val hyperServices = HyperServices(fragmentActivity, clientId)
+        hyperServicesMap.put(clientId!!, hyperServices)
 
         val invokeMethodResult = object : Result {
             override fun success(result: Any?) {
@@ -150,9 +160,9 @@ class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Pl
         result.error("INIT_ERROR", e.localizedMessage, e)
     }
 
-    private fun process(params: Map<String, Any>?, result: Result) {
-        if (hyperServices != null) {
-            hyperServices!!.process(JSONObject(params))
+    private fun process(params: Map<String, Any>?, clientId: String?, result: Result) {
+        if (hyperServicesMap.get(clientId) != null) {
+            hyperServicesMap.get(clientId)!!.process(JSONObject(params))
             result.success(true)
         } else {
             Log.e(this.javaClass.canonicalName, "initiate() must be called before calling process()")
@@ -160,7 +170,7 @@ class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Pl
         }
     }
 
-    private fun openPaymentPage(params: Map<String, Any>?, result : Result) {
+    private fun openPaymentPage(params: Map<String, Any>?, clientId: String?, result : Result) {
         isHyperCheckOutLiteInteg = true
         val invokeMethodResult = object : Result {
             override fun success(result: Any?) {
@@ -191,9 +201,9 @@ class HyperSdkFlutterPlugin: FlutterPlugin, MethodCallHandler, ActivityAware, Pl
             params?.let { JSONObject(it) }, callback)
     }
 
-    private fun terminate(result: Result) {
-        if (hyperServices != null) {
-            hyperServices!!.terminate()
+    private fun terminate(clientId: String?, result: Result) {
+        if (hyperServicesMap.get(clientId) != null) {
+            hyperServicesMap.get(clientId)!!.terminate()
             result.success(true)
         } else {
             Log.w(this.javaClass.canonicalName, "Terminate called without initiate, skipping")

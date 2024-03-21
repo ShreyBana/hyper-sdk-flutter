@@ -16,7 +16,7 @@ buildscript {
     ....
     ext {
         ....
-        clientId = "<clientId shared by Juspay team>"
+        clientIds = ["<clientId(s) shared by Juspay team>"]
         hyperSDKVersion = "2.1.24"
         ....
     }
@@ -76,12 +76,13 @@ import 'package:hypersdk/hypersdkflutter.dart';
 
 ### Step-1: Create Juspay Object
 
-This method creates an instance of Juspay class on which all the HyperSDK APIs / methods are triggered.
+This method creates an instance of Juspay class on which all the HyperSDK APIs / methods are triggered, & needs to be created
+for EACH client id separately.
 
 Note: This method is mandatory and is required to call any other subsequent methods from HyperSDK.
 
 ```dart
-final hyperSDK = HyperSDK();
+final hyperSDK = HyperSDK(clientId);
 ```
 
 ### Step-2: Initiate

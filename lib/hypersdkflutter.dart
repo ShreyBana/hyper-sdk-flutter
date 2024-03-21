@@ -16,6 +16,10 @@ class HyperSDK {
   /// @nodoc
   static MethodChannel hyperSDK = const MethodChannel('hyperSDK');
 
+  String clientId;
+
+  HyperSDK(this.clientId);
+
   /// @nodoc
   void dispose() {
     hyperSDK.setMethodCallHandler(null);
@@ -24,14 +28,17 @@ class HyperSDK {
   /// Check if SDK is initiated. If SDK is not initiated first call initiate to setup SDK.
   /// {@category Required}
   Future<bool> isInitialised() async {
-    return await hyperSDK.invokeMethod('isInitialised') == true ? true : false;
+    return await hyperSDK.invokeMethod('isInitialised', <String, dynamic> {
+      'clientId': clientId
+    }) == true ? true : false;
   }
 
   /// Fetches dynamic assets for SDK.
   /// {@category Optional}
-  static Future<String> preFetch(Map<String, dynamic> params) async {
+  Future<String> preFetch(Map<String, dynamic> params) async {
     var result = await hyperSDK.invokeMethod('preFetch', <String, dynamic>{
       'params': params,
+      'clientId': clientId
     });
     return result.toString();
   }
@@ -44,6 +51,7 @@ class HyperSDK {
       void Function(MethodCall) initiateHandler) async {
     var result = await hyperSDK.invokeMethod('initiate', <String, dynamic>{
       'params': params,
+      'clientId': clientId
     });
 
     // Wrapper function to eliminate redundant Future<dynamic> return value
@@ -65,6 +73,7 @@ class HyperSDK {
       void Function(MethodCall) processHandler) async {
     var result = await hyperSDK.invokeMethod('process', <String, dynamic>{
       'params': params,
+      'clientId': clientId
     });
 
     // Wrapper function to eliminate redundant Future<dynamic> return value
@@ -80,14 +89,18 @@ class HyperSDK {
   /// Kills the SDK and cleans up any extra resources.
   /// {@category Optional}
   Future<String> terminate() async {
-    var result = await hyperSDK.invokeMethod('terminate');
+    var result = await hyperSDK.invokeMethod('terminate', <String, dynamic>{
+      'clientId': clientId
+    });
     return result.toString();
   }
 
   /// Required for Android backpress handling.
   /// {@category Required}
   Future<String> onBackPress() async {
-    var result = await hyperSDK.invokeMethod('onBackPress');
+    var result = await hyperSDK.invokeMethod('onBackPress', <String, dynamic> {
+      'clientId': clientId
+    });
     return result.toString();
   }
 
@@ -101,7 +114,8 @@ class HyperSDK {
     hyperSDK.setMethodCallHandler(callbackFunction);
     var result =
         await hyperSDK.invokeMethod('openPaymentPage', <String, dynamic>{
-      'params': params,
+          'params': params,
+          'clientId': clientId
     });
 
     return result.toString();
